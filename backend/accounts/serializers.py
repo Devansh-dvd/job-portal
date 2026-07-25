@@ -1,9 +1,9 @@
-from rest_framework import serializers
-from .models import employee
+from rest_framework import serializers           # Import serializer classes
+from .models import employee                     # Import employee model
 
 
-class EmployeeSerializer(serializers.ModelSerializer):
+class EmployeeSerializer(serializers.ModelSerializer):   # Serializer for employee model
 
-    class Meta:
-        model = employee
-        fields = "__all__"
+    class Meta:                                  # Serializer configuration
+        model = employee                         # Model associated with this serializer
+        fields = "__all__"                       # Include all model fields
