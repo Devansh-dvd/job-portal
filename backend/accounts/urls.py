@@ -1,6 +1,4 @@
-from django.urls import path                          
-from .apiviews import employees                     
+from django.urls import path
 
-urlpatterns = [
-    path("employees/", employees),                     
-]
+urlpatterns = []
+

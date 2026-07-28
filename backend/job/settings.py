@@ -133,3 +133,5 @@ STATICFILES_DIRS = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8081",                  # Allow requests from React (Vite)
 ]
+
+AUTH_USER_MODEL = "accounts.User"

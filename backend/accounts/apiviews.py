@@ -2,41 +2,39 @@ from rest_framework.decorators import api_view          # Makes this function a 
 from rest_framework.response import Response             # Returns JSON response
 from rest_framework import status                        # Gives HTTP status codes
 
-from .models import employee                           # Import Employee model
-from .serializers import EmployeeSerializer             # Import serializer
+from .models import User
+from .serializers import UserSerializer
 
+@api_view(["GET", "POST"])
+def users(request):
 
-@api_view(["GET", "POST"])                              # Allow both GET and POST requests
-def employees(request):
+    if request.method == "GET":
 
-    if request.method == "GET":                         # If the request is GET
+        users = User.objects.all()
 
-        employees = employee.objects.all()              # Fetch all employees
-
-        serializer = EmployeeSerializer(
-            employees,
-            many=True                                   # many=True because multiple objects are returned
+        serializer = UserSerializer(
+            users,
+            many=True
         )
 
-        return Response(serializer.data)                # Return JSON
+        return Response(serializer.data)
 
+    elif request.method == "POST":
 
-    elif request.method == "POST":                      # If the request is POST
-
-        serializer = EmployeeSerializer(                # Create serializer using incoming JSON
+        serializer = UserSerializer(
             data=request.data
         )
 
-        if serializer.is_valid():                       # Check whether JSON is valid
+        if serializer.is_valid():
 
-            serializer.save()                           # Save employee into PostgreSQL
+            serializer.save()
 
             return Response(
-                serializer.data,                        # Return created employee
-                status=status.HTTP_201_CREATED          # HTTP Status 201 = Created
+                serializer.data,
+                status=status.HTTP_201_CREATED
             )
 
         return Response(
-            serializer.errors,                          # Return validation errors
-            status=status.HTTP_400_BAD_REQUEST          # HTTP Status 400 = Invalid input
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
         )
