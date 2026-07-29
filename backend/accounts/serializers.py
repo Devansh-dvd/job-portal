@@ -1,9 +1,23 @@
-from rest_framework import serializers           # Import serializer classes
-from .models import User                   # Import employee model
+from rest_framework import serializers
+from .models import User
+
+class UserSerializer(serializers.ModelSerializer):
+
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+
+        fields = ['id', 'username', 'email', 'password', 'profile_picture', 'resume', 'description']
+
+        def create(self , validated_data):
+
+            password = validated_data.pop('password',)
+            user = User(**validated_data)
+            user.set_password(password) # hash the password
+            user.save()
+            return user # return created user object
 
 
-class UserSerializer(serializers.ModelSerializer):   # Serializer for employee model
-
-    class Meta:                                  # Serializer configuration
-        model = User                         # Model associated with this serializer
-        fields = "__all__"                       # Include all model fields
+        
+        

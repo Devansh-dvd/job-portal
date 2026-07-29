@@ -1,4 +1,6 @@
 from django.urls import path
+from .apiviews import register
 
-urlpatterns = []
-
+urlpatterns = [
+    path('register/', register),
+]
