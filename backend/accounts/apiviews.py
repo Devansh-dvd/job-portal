@@ -1,11 +1,16 @@
 from rest_framework.decorators import api_view
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.decorators import parser_classes
 
 from .serializers import UserSerializer
 
 @api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
 def register(request):
+    print(request.data)
+    print(request.FILES)
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()

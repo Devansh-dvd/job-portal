@@ -135,3 +135,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 AUTH_USER_MODEL = "accounts.User"
+
+MEDIA_URL = "/temp/"
+MEDIA_ROOT = BASE_DIR / "temp"
+
