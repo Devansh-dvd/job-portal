@@ -7,17 +7,19 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'password',
+            'profile_picture',
+            'resume',
+            'description'
+        ]
 
-        fields = ['id', 'username', 'email', 'password', 'profile_picture', 'resume', 'description']
-
-        def create(self , validated_data):
-
-            password = validated_data.pop('password',)
-            user = User(**validated_data)
-            user.set_password(password) # hash the password
-            user.save()
-            return user # return created user object
-
-
-        
-        
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
