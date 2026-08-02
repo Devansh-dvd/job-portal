@@ -1,13 +1,14 @@
-from rest_framework.decorators import api_view
-from rest_framework import status
+from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.decorators import parser_classes
-from .serializers import UserSerializer
 from django.contrib.auth import authenticate
-from .serializers import LoginSerializer
-import cloudinary.uploader  
 
+from .models import User
+from .serializers import UserSerializer, LoginSerializer
+
+import cloudinary.uploader
+ 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
 def register(request):
@@ -47,23 +48,43 @@ def login(request):
 
     if serializer.is_valid():
 
-        username = serializer.validated_data["username"]
+        email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
 
+        try:
+            user_obj = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {
+                    "message": "Invalid email or password"
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         user = authenticate(
-            username=username,
+            username=user_obj.username,
             password=password
         )
 
         if user is None:
             return Response(
-                {"message": "Invalid username or password"},
+                {
+                    "message": "Invalid email or password"
+                },
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
         return Response(
             {
-                "message": "Login successful"
+                "message": "Login successful",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "profile_picture": user.profile_picture,
+                    "resume": user.resume,
+                    "description": user.description
+                }
             },
             status=status.HTTP_200_OK
         )
