@@ -13,7 +13,7 @@ import cloudinary.uploader
 @parser_classes([MultiPartParser, FormParser])
 def register(request):
 
-    data = request.data.copy()
+    data = request.data.dict()
 
     profile_picture = request.FILES.get("profile_picture")
     resume = request.FILES.get("resume")
