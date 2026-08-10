@@ -3,13 +3,15 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
 from .serializers import UserSerializer, LoginSerializer
 
 import cloudinary.uploader
- 
-@api_view(['POST'])
+
+
+@api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
 def register(request):
 
@@ -29,17 +31,27 @@ def register(request):
     serializer = UserSerializer(data=data)
 
     if serializer.is_valid():
-        serializer.save()
+
+        user = serializer.save()
+
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+
         return Response(
             {
                 "message": "User registered successfully",
+                "access": access,
+                "refresh": str(refresh),
                 "user": serializer.data
             },
             status=status.HTTP_201_CREATED
         )
 
-    print(serializer.errors)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(
+        serializer.errors,
+        status=status.HTTP_400_BAD_REQUEST
+    )
+
 
 @api_view(["POST"])
 def login(request):
@@ -74,19 +86,24 @@ def login(request):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+
         return Response(
             {
                 "message": "Login successful",
+                "access": access,
+                "refresh": str(refresh),
                 "user": {
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
                     "profile_picture": user.profile_picture,
                     "resume": user.resume,
-                    "description": user.description
-                }
+                    "description": user.description,
+                },
             },
-            status=status.HTTP_200_OK
+            status=status.HTTP_200_OK,
         )
 
     return Response(
