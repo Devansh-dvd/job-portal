@@ -5,8 +5,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User
-from .serializers import UserSerializer, LoginSerializer
+from .models import User , JobApplication
+from .serializers import UserSerializer, LoginSerializer , JobApplicationSerializer
 
 import cloudinary.uploader
 
@@ -104,6 +104,28 @@ def login(request):
                 },
             },
             status=status.HTTP_200_OK,
+        )
+
+    return Response(
+        serializer.errors,
+        status=status.HTTP_400_BAD_REQUEST
+    )
+
+
+@api_view(["POST"])
+def create_application(request):
+
+    serializer = JobApplicationSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save(user=request.user)
+
+        return Response(
+            {
+                "message": "Job application created successfully",
+                "application": serializer.data
+            },
+            status=status.HTTP_201_CREATED
         )
 
     return Response(
