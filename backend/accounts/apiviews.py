@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -261,3 +262,55 @@ def login_hiring_team(request):
         )
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me(request):
+    user = request.user
+    if user.is_hiring_team:
+        team_data = None
+        try:
+            team = user.hiring_team_profile
+            team_data = {
+                "teamName": team.team_name,
+                "teamUniqueId": team.team_unique_id,
+                "email": team.email,
+                "location": team.location,
+                "contact": team.contact,
+                "websiteLink": team.website_link or "",
+                "logo": team.logo or "",
+            }
+        except HiringTeam.DoesNotExist:
+            pass
+
+        return Response(
+            {
+                "type": "hiring_team",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "profile_picture": user.profile_picture,
+                    "resume": user.resume,
+                    "description": user.description,
+                },
+                "team": team_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    return Response(
+        {
+            "type": "user",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "profile_picture": user.profile_picture,
+                "resume": user.resume,
+                "description": user.description,
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
