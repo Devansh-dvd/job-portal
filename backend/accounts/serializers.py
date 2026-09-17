@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, JobApplication, HiringTeam
+from .models import User, JobApplication, HiringTeam, InterviewBooking
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -67,3 +67,53 @@ class CreateJobSerializer(serializers.Serializer):
     description = serializers.CharField()
     requirements = serializers.CharField(required=False, allow_blank=True)
     tags = serializers.CharField(max_length=500, required=False, allow_blank=True)
+
+
+class CandidateSerializer(serializers.ModelSerializer):
+    booked_interviews_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "profile_picture",
+            "resume",
+            "description",
+            "date_joined",
+            "booked_interviews_count",
+        ]
+
+    def get_booked_interviews_count(self, obj):
+        return obj.booked_interviews.filter(status="scheduled").count()
+
+
+class InterviewBookingSerializer(serializers.ModelSerializer):
+    candidate_username = serializers.CharField(source="candidate.username", read_only=True)
+    candidate_email = serializers.CharField(source="candidate.email", read_only=True)
+    candidate_profile_picture = serializers.URLField(source="candidate.profile_picture", read_only=True)
+    candidate_resume = serializers.URLField(source="candidate.resume", read_only=True)
+    team_name = serializers.CharField(source="hiring_team.team_name", read_only=True)
+
+    class Meta:
+        model = InterviewBooking
+        fields = [
+            "id",
+            "hiring_team",
+            "candidate",
+            "candidate_username",
+            "candidate_email",
+            "candidate_profile_picture",
+            "candidate_resume",
+            "team_name",
+            "role",
+            "interview_date",
+            "interview_type",
+            "duration_minutes",
+            "meeting_link",
+            "notes",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["id", "hiring_team", "created_at"]

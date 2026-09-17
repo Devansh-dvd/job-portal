@@ -94,3 +94,41 @@ class Job(models.Model):
 
     def __str__(self):
         return f"{self.title} @ {self.hiring_team.team_name}"
+
+
+class InterviewBooking(models.Model):
+    INTERVIEW_TYPE_CHOICES = [
+        ("Screening", "Initial Screening"),
+        ("Technical", "Technical Round"),
+        ("Design", "System Design / Portfolio"),
+        ("Culture", "Culture & Leadership"),
+        ("Final", "Final Discussion"),
+    ]
+
+    STATUS_CHOICES = [
+        ("scheduled", "Scheduled"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    hiring_team = models.ForeignKey(
+        HiringTeam,
+        on_delete=models.CASCADE,
+        related_name="interview_bookings"
+    )
+    candidate = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="booked_interviews"
+    )
+    role = models.CharField(max_length=200)
+    interview_date = models.DateTimeField()
+    interview_type = models.CharField(max_length=50, default="Technical")
+    duration_minutes = models.IntegerField(default=45)
+    meeting_link = models.URLField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="scheduled")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Interview: {self.candidate.username} for {self.role} by {self.hiring_team.team_name}"

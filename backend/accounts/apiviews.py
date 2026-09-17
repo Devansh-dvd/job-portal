@@ -6,8 +6,16 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User, JobApplication, HiringTeam
-from .serializers import UserSerializer, LoginSerializer, JobApplicationSerializer, RegisterHiringTeamSerializer
+from django.db.models import Q
+from .models import User, JobApplication, HiringTeam, InterviewBooking
+from .serializers import (
+    UserSerializer,
+    LoginSerializer,
+    JobApplicationSerializer,
+    RegisterHiringTeamSerializer,
+    CandidateSerializer,
+    InterviewBookingSerializer,
+)
 
 import cloudinary.uploader
 
@@ -314,3 +322,179 @@ def me(request):
         },
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(["GET"])
+def list_candidates(request):
+    """
+    Returns candidate users (is_hiring_team=False).
+    Supports ?search= keyword query across username, email, description.
+    If requested by an authenticated hiring team, also attaches booking info.
+    """
+    search = request.GET.get("search", "").strip()
+    candidates = User.objects.filter(is_hiring_team=False)
+
+    if search:
+        candidates = candidates.filter(
+            Q(username__icontains=search)
+            | Q(email__icontains=search)
+            | Q(description__icontains=search)
+        )
+
+    candidates = candidates.order_by("-date_joined")
+
+    current_team = None
+    if request.user.is_authenticated and getattr(request.user, "is_hiring_team", False):
+        try:
+            current_team = request.user.hiring_team_profile
+        except HiringTeam.DoesNotExist:
+            current_team = None
+
+    results = []
+    for c in candidates:
+        candidate_data = {
+            "id": c.id,
+            "username": c.username,
+            "email": c.email,
+            "profile_picture": c.profile_picture,
+            "resume": c.resume,
+            "description": c.description,
+            "date_joined": c.date_joined,
+            "has_booked_interview": False,
+            "latest_interview": None,
+        }
+
+        if current_team:
+            latest_booking = (
+                InterviewBooking.objects.filter(
+                    hiring_team=current_team,
+                    candidate=c,
+                    status="scheduled",
+                )
+                .order_by("-interview_date")
+                .first()
+            )
+            if latest_booking:
+                candidate_data["has_booked_interview"] = True
+                candidate_data["latest_interview"] = {
+                    "id": latest_booking.id,
+                    "role": latest_booking.role,
+                    "interview_date": latest_booking.interview_date,
+                    "interview_type": latest_booking.interview_type,
+                    "duration_minutes": latest_booking.duration_minutes,
+                    "meeting_link": latest_booking.meeting_link,
+                    "notes": latest_booking.notes,
+                    "status": latest_booking.status,
+                }
+
+        results.append(candidate_data)
+
+    return Response(results, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_interview_booking(request):
+    """
+    Allows a logged-in hiring team to schedule an interview with a candidate.
+    """
+    user = request.user
+    if not getattr(user, "is_hiring_team", False):
+        return Response(
+            {"message": "Only hiring teams can schedule interviews."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        team = user.hiring_team_profile
+    except HiringTeam.DoesNotExist:
+        return Response(
+            {"message": "Hiring team profile not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    candidate_id = request.data.get("candidate_id") or request.data.get("candidate")
+    role = (request.data.get("role") or "").strip()
+    interview_date = request.data.get("interview_date")
+    interview_type = request.data.get("interview_type") or "Technical Round"
+    duration_minutes = request.data.get("duration_minutes") or 45
+    meeting_link = (request.data.get("meeting_link") or "").strip()
+    notes = (request.data.get("notes") or "").strip()
+
+    if not candidate_id:
+        return Response(
+            {"message": "Candidate ID is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not role:
+        return Response(
+            {"message": "Job role/position is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not interview_date:
+        return Response(
+            {"message": "Interview date and time are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        candidate = User.objects.get(id=candidate_id, is_hiring_team=False)
+    except User.DoesNotExist:
+        return Response(
+            {"message": "Candidate not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        duration_int = int(duration_minutes)
+    except (TypeError, ValueError):
+        duration_int = 45
+
+    booking = InterviewBooking.objects.create(
+        hiring_team=team,
+        candidate=candidate,
+        role=role,
+        interview_date=interview_date,
+        interview_type=interview_type,
+        duration_minutes=duration_int,
+        meeting_link=meeting_link or None,
+        notes=notes or None,
+        status="scheduled",
+    )
+
+    serializer = InterviewBookingSerializer(booking)
+    return Response(
+        {
+            "message": f"Interview scheduled successfully with {candidate.username}!",
+            "booking": serializer.data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_interviews(request):
+    """
+    Returns all interviews booked by the authenticated hiring team.
+    """
+    user = request.user
+    if not getattr(user, "is_hiring_team", False):
+        return Response(
+            {"message": "Only hiring teams can access scheduled interviews."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        team = user.hiring_team_profile
+    except HiringTeam.DoesNotExist:
+        return Response(
+            {"message": "Hiring team profile not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    interviews = InterviewBooking.objects.filter(hiring_team=team).order_by("-interview_date")
+    serializer = InterviewBookingSerializer(interviews, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
