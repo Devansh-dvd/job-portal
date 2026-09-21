@@ -34,7 +34,7 @@ def register(request):
         data["profile_picture"] = result["secure_url"]
 
     if resume:
-        result_resume = cloudinary.uploader.upload(resume)
+        result_resume = cloudinary.uploader.upload(resume, resource_type="raw")
         data["resume"] = result_resume["secure_url"]
 
     serializer = UserSerializer(data=data)
