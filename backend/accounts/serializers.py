@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, JobApplication, HiringTeam, InterviewBooking
+from .models import User, JobApplication, HiringTeam, InterviewBooking, Notification
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -116,4 +116,42 @@ class InterviewBookingSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
-        read_only_fields = ["id", "hiring_team", "created_at"]
+        read_only_fields = ["id", "hiring_team", "created_at"]
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    interview_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "recipient",
+            "title",
+            "message",
+            "notification_type",
+            "related_interview",
+            "interview_details",
+            "is_read",
+            "created_at",
+        ]
+        read_only_fields = ["id", "recipient", "created_at"]
+
+    def get_interview_details(self, obj):
+        if not obj.related_interview:
+            return None
+        iv = obj.related_interview
+        return {
+            "id": iv.id,
+            "role": iv.role,
+            "team_name": iv.hiring_team.team_name,
+            "team_logo": iv.hiring_team.logo,
+            "team_location": iv.hiring_team.location,
+            "interview_date": iv.interview_date,
+            "interview_type": iv.interview_type,
+            "duration_minutes": iv.duration_minutes,
+            "meeting_link": iv.meeting_link,
+            "notes": iv.notes,
+            "status": iv.status,
+        }
+

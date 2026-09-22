@@ -9,6 +9,9 @@ from .apiviews import (
     list_candidates,
     create_interview_booking,
     list_interviews,
+    list_notifications,
+    mark_notification_as_read,
+    list_candidate_interviews,
 )
 from rest_framework_simplejwt.views import (TokenObtainPairView, TokenRefreshView)
 
@@ -22,6 +25,10 @@ urlpatterns = [
     path('candidates/', list_candidates, name='list_candidates'),
     path('interviews/', create_interview_booking, name='create_interview_booking'),
     path('interviews/my/', list_interviews, name='list_interviews'),
+    path('notifications/', list_notifications, name='list_notifications'),
+    path('notifications/mark-read/', mark_notification_as_read, name='mark_notification_as_read'),
+    path('candidates/my-interviews/', list_candidate_interviews, name='list_candidate_interviews'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
+

@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.db.models import Q
-from .models import User, JobApplication, HiringTeam, InterviewBooking
+from .models import User, JobApplication, HiringTeam, InterviewBooking, Notification
 from .serializers import (
     UserSerializer,
     LoginSerializer,
@@ -15,6 +15,7 @@ from .serializers import (
     RegisterHiringTeamSerializer,
     CandidateSerializer,
     InterviewBookingSerializer,
+    NotificationSerializer,
 )
 
 import cloudinary.uploader
@@ -464,6 +465,15 @@ def create_interview_booking(request):
         status="scheduled",
     )
 
+    # Create real-time alert notification for candidate
+    Notification.objects.create(
+        recipient=candidate,
+        title=f"New Interview with {team.team_name}!",
+        message=f"{team.team_name} has scheduled a {interview_type} for '{role}'.",
+        notification_type="interview_booked",
+        related_interview=booking,
+    )
+
     serializer = InterviewBookingSerializer(booking)
     return Response(
         {
@@ -497,4 +507,62 @@ def list_interviews(request):
 
     interviews = InterviewBooking.objects.filter(hiring_team=team).order_by("-interview_date")
     serializer = InterviewBookingSerializer(interviews, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_notifications(request):
+    """
+    Returns notifications for the authenticated user, ordered by newest first,
+    along with the count of unread notifications.
+    """
+    notifications = Notification.objects.filter(recipient=request.user).order_by("-created_at")[:50]
+    unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(
+        {
+            "unread_count": unread_count,
+            "notifications": serializer.data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def mark_notification_as_read(request):
+    """
+    Marks a specific notification as read, or marks all as read if mark_all is True.
+    """
+    mark_all = request.data.get("mark_all", False)
+    notification_id = request.data.get("notification_id") or request.data.get("id")
+
+    if mark_all:
+        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    elif notification_id:
+        Notification.objects.filter(id=notification_id, recipient=request.user).update(is_read=True)
+    else:
+        # Default to marking all read if neither specified
+        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+
+    remaining_unread = Notification.objects.filter(recipient=request.user, is_read=False).count()
+    return Response(
+        {
+            "message": "Notifications updated successfully.",
+            "unread_count": remaining_unread,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_candidate_interviews(request):
+    """
+    Returns all interviews scheduled with the authenticated candidate.
+    """
+    interviews = InterviewBooking.objects.filter(candidate=request.user).order_by("-interview_date")
+    serializer = InterviewBookingSerializer(interviews, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+

@@ -131,4 +131,31 @@ class InterviewBooking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Interview: {self.candidate.username} for {self.role} by {self.hiring_team.team_name}"
+        return f"Interview: {self.candidate.username} for {self.role} by {self.hiring_team.team_name}"
+
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    notification_type = models.CharField(max_length=50, default="interview_booked")
+    related_interview = models.ForeignKey(
+        InterviewBooking,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications"
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Notification for {self.recipient.username}: {self.title}"
+
