@@ -95,6 +95,11 @@ class InterviewBookingSerializer(serializers.ModelSerializer):
     candidate_profile_picture = serializers.URLField(source="candidate.profile_picture", read_only=True)
     candidate_resume = serializers.URLField(source="candidate.resume", read_only=True)
     team_name = serializers.CharField(source="hiring_team.team_name", read_only=True)
+    team_logo = serializers.URLField(source="hiring_team.logo", read_only=True)
+    team_location = serializers.CharField(source="hiring_team.location", read_only=True)
+    team_contact = serializers.CharField(source="hiring_team.contact", read_only=True)
+    team_email = serializers.EmailField(source="hiring_team.email", read_only=True)
+    team_website = serializers.URLField(source="hiring_team.website_link", read_only=True)
 
     class Meta:
         model = InterviewBooking
@@ -107,6 +112,11 @@ class InterviewBookingSerializer(serializers.ModelSerializer):
             "candidate_profile_picture",
             "candidate_resume",
             "team_name",
+            "team_logo",
+            "team_location",
+            "team_contact",
+            "team_email",
+            "team_website",
             "role",
             "interview_date",
             "interview_type",
