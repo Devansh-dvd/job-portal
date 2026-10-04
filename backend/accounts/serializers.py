@@ -3,6 +3,9 @@ from .models import User, JobApplication, HiringTeam, InterviewBooking, Notifica
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    interested_roles = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
 
     class Meta:
         model = User
@@ -14,6 +17,7 @@ class UserSerializer(serializers.ModelSerializer):
             "profile_picture",
             "resume",
             "description",
+            "interested_roles",
         ]
 
     def create(self, validated_data):
@@ -71,6 +75,9 @@ class CreateJobSerializer(serializers.Serializer):
 
 class CandidateSerializer(serializers.ModelSerializer):
     booked_interviews_count = serializers.SerializerMethodField()
+    interested_roles = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
 
     class Meta:
         model = User
@@ -81,6 +88,7 @@ class CandidateSerializer(serializers.ModelSerializer):
             "profile_picture",
             "resume",
             "description",
+            "interested_roles",
             "date_joined",
             "booked_interviews_count",
         ]

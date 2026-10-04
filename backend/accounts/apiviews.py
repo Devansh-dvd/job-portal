@@ -25,7 +25,22 @@ import cloudinary.uploader
 @parser_classes([MultiPartParser, FormParser])
 def register(request):
 
-    data = request.data.dict()
+    data = request.data.dict() if hasattr(request.data, "dict") else dict(request.data)
+
+    interested_roles = request.data.get("interested_roles")
+    if interested_roles:
+        if isinstance(interested_roles, str):
+            try:
+                import json
+                data["interested_roles"] = json.loads(interested_roles)
+            except Exception:
+                data["interested_roles"] = [r.strip() for r in interested_roles.split(",") if r.strip()]
+        elif isinstance(interested_roles, list):
+            data["interested_roles"] = interested_roles
+    elif hasattr(request.data, "getlist") and request.data.getlist("interested_roles[]"):
+        data["interested_roles"] = request.data.getlist("interested_roles[]")
+    elif hasattr(request.data, "getlist") and request.data.getlist("interested_roles"):
+        data["interested_roles"] = request.data.getlist("interested_roles")
 
     profile_picture = request.FILES.get("profile_picture")
     resume = request.FILES.get("resume")
@@ -111,6 +126,7 @@ def login(request):
                     "profile_picture": user.profile_picture,
                     "resume": user.resume,
                     "description": user.description,
+                    "interested_roles": user.interested_roles or [],
                 },
             },
             status=status.HTTP_200_OK,
@@ -303,6 +319,7 @@ def me(request):
                     "profile_picture": user.profile_picture,
                     "resume": user.resume,
                     "description": user.description,
+                    "interested_roles": user.interested_roles or [],
                 },
                 "team": team_data,
             },
@@ -319,6 +336,45 @@ def me(request):
                 "profile_picture": user.profile_picture,
                 "resume": user.resume,
                 "description": user.description,
+                "interested_roles": user.interested_roles or [],
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["PATCH", "POST"])
+@permission_classes([IsAuthenticated])
+def update_profile(request):
+    user = request.user
+    data = request.data
+
+    if "description" in data:
+        user.description = data["description"]
+
+    if "interested_roles" in data:
+        roles = data["interested_roles"]
+        if isinstance(roles, str):
+            try:
+                import json
+                roles = json.loads(roles)
+            except Exception:
+                roles = [r.strip() for r in roles.split(",") if r.strip()]
+        if isinstance(roles, list):
+            user.interested_roles = roles
+
+    user.save()
+    return Response(
+        {
+            "message": "Profile updated successfully",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "profile_picture": user.profile_picture,
+                "resume": user.resume,
+                "description": user.description,
+                "interested_roles": user.interested_roles or [],
             },
         },
         status=status.HTTP_200_OK,
@@ -329,7 +385,7 @@ def me(request):
 def list_candidates(request):
     """
     Returns candidate users (is_hiring_team=False).
-    Supports ?search= keyword query across username, email, description.
+    Supports ?search= keyword query across username, email, description, interested_roles.
     If requested by an authenticated hiring team, also attaches booking info.
     """
     search = request.GET.get("search", "").strip()
@@ -340,6 +396,7 @@ def list_candidates(request):
             Q(username__icontains=search)
             | Q(email__icontains=search)
             | Q(description__icontains=search)
+            | Q(interested_roles__icontains=search)
         )
 
     candidates = candidates.order_by("-date_joined")
@@ -360,6 +417,7 @@ def list_candidates(request):
             "profile_picture": c.profile_picture,
             "resume": c.resume,
             "description": c.description,
+            "interested_roles": c.interested_roles or [],
             "date_joined": c.date_joined,
             "has_booked_interview": False,
             "latest_interview": None,
