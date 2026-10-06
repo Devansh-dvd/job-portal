@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.db.models import Q
+from django.utils import timezone
 from .models import User, JobApplication, HiringTeam, InterviewBooking, Notification
 from .serializers import (
     UserSerializer,
@@ -381,6 +382,18 @@ def update_profile(request):
     )
 
 
+def update_expired_interviews():
+    """
+    Finds all interview bookings where status is 'scheduled' but the scheduled time
+    is in the past (interview_date <= now), and updates their status to 'completed'.
+    """
+    now = timezone.now()
+    InterviewBooking.objects.filter(
+        status="scheduled",
+        interview_date__lte=now,
+    ).update(status="completed")
+
+
 @api_view(["GET"])
 def list_candidates(request):
     """
@@ -388,6 +401,8 @@ def list_candidates(request):
     Supports ?search= keyword query across username, email, description, interested_roles.
     If requested by an authenticated hiring team, also attaches booking info.
     """
+    update_expired_interviews()
+
     search = request.GET.get("search", "").strip()
     candidates = User.objects.filter(is_hiring_team=False)
 
@@ -409,6 +424,7 @@ def list_candidates(request):
             current_team = None
 
     results = []
+    now = timezone.now()
     for c in candidates:
         candidate_data = {
             "id": c.id,
@@ -429,6 +445,7 @@ def list_candidates(request):
                     hiring_team=current_team,
                     candidate=c,
                     status="scheduled",
+                    interview_date__gt=now,
                 )
                 .order_by("-interview_date")
                 .first()
@@ -546,7 +563,9 @@ def create_interview_booking(request):
 @permission_classes([IsAuthenticated])
 def list_interviews(request):
     """
-    Returns all interviews booked by the authenticated hiring team.
+    Returns interviews booked by the authenticated hiring team.
+    By default, returns only active scheduled interviews where the scheduled time has not passed.
+    Pass ?include_past=true or ?status=all to include past/completed interviews.
     """
     user = request.user
     if not getattr(user, "is_hiring_team", False):
@@ -563,7 +582,25 @@ def list_interviews(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    interviews = InterviewBooking.objects.filter(hiring_team=team).order_by("-interview_date")
+    # First, mark any interview whose scheduled time has passed as completed
+    update_expired_interviews()
+
+    include_past = request.query_params.get("include_past", "false").lower() in ("true", "1")
+    status_filter = request.query_params.get("status")
+
+    qs = InterviewBooking.objects.filter(hiring_team=team)
+
+    if include_past or status_filter == "all":
+        pass
+    elif status_filter == "completed":
+        qs = qs.filter(status="completed")
+    elif status_filter == "cancelled":
+        qs = qs.filter(status="cancelled")
+    else:
+        # Default: only active upcoming interviews whose scheduled time is not gone
+        qs = qs.filter(status="scheduled", interview_date__gt=timezone.now())
+
+    interviews = qs.order_by("interview_date")
     serializer = InterviewBookingSerializer(interviews, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -620,7 +657,41 @@ def list_candidate_interviews(request):
     """
     Returns all interviews scheduled with the authenticated candidate.
     """
+    update_expired_interviews()
     interviews = InterviewBooking.objects.filter(candidate=request.user).order_by("-interview_date")
     serializer = InterviewBookingSerializer(interviews, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["DELETE", "POST"])
+@permission_classes([IsAuthenticated])
+def delete_interview(request, pk):
+    """
+    Allows a hiring team or candidate to cancel/delete a scheduled interview booking.
+    """
+    try:
+        booking = InterviewBooking.objects.get(pk=pk)
+    except InterviewBooking.DoesNotExist:
+        return Response(
+            {"message": "Interview booking not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    user = request.user
+    is_team_owner = (
+        hasattr(user, "hiring_team_profile")
+        and booking.hiring_team == user.hiring_team_profile
+    )
+    is_candidate = booking.candidate == user
+    if not (is_team_owner or is_candidate or user.is_staff):
+        return Response(
+            {"message": "You are not authorized to remove this interview."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    booking.delete()
+    return Response(
+        {"message": "Interview removed successfully."},
+        status=status.HTTP_200_OK,
+    )
 

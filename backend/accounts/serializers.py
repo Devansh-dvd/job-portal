@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils import timezone
 from .models import User, JobApplication, HiringTeam, InterviewBooking, Notification
 
 class UserSerializer(serializers.ModelSerializer):
@@ -94,7 +95,8 @@ class CandidateSerializer(serializers.ModelSerializer):
         ]
 
     def get_booked_interviews_count(self, obj):
-        return obj.booked_interviews.filter(status="scheduled").count()
+        now = timezone.now()
+        return obj.booked_interviews.filter(status="scheduled", interview_date__gt=now).count()
 
 
 class InterviewBookingSerializer(serializers.ModelSerializer):
